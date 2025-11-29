@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Jarvis HUD – Fluxos</title>
+  <style>
+    body{font-family:Inter,Arial,Helvetica,sans-serif;background:#050607;color:#e6eef3;margin:0;padding:18px;}
+    h1{font-size:20px;margin:0 0 12px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+    .card{background:#0d1113;padding:12px;border-radius:10px;border:1px solid #17202a}
+    .label{font-size:12px;color:#9fb4c7}
+    .value{font-size:18px;margin-top:6px}
+    .small{font-size:11px;color:#7e98a6}
+    .green{color:#3ee6a8}.red{color:#ff6b6b}.muted{color:#6f8896}
+    #log{margin-top:12px;font-size:12px;color:#7a8b96;max-height:160px;overflow:auto}
+  </style>
+</head>
+<body>
+  <h1>JARVIS HUD – Fluxo & Liquidez</h1>
+  <div class="grid" id="grid"></div>
+  <div id="log"></div>
+
+<script>
+const grid = document.getElementById('grid');
+const log = document.getElementById('log');
+
+const cards = [
+  { id:'coingecko', label:'CoinGecko – Global' },
+  { id:'coinpaprika', label:'CoinPaprika – Global' },
+  { id:'coinglass_fng', label:'Coinglass – sample flow' },
+  { id:'fng', label:'Fear & Greed (Alternative.me)' },
+  { id:'altseason', label:'Altcoin Season Index (Coin-Stats)' },
+  { id:'icnt_depth', label:'MEXC Depth – ICNT/USDT' }
+];
+
+cards.forEach(c => {
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `<div class="label">${c.label}</div><div class="value" id="${c.id}">…</div><div class="small" id="${c.id}_small"></div>`;
+  grid.appendChild(el);
+});
+
+function writeLog(s){ const t = document.createElement('div'); t.textContent = (new Date()).toLocaleTimeString() + ' — ' + s; log.prepend(t); if(log.childElementCount>200) log.removeChild(log.lastChild); }
+
+async function fetchJson(path){
+  try{
+    const r = await fetch(path);
+    const j = await r.json();
+    return j;
+  }catch(e){ return { success:false, error:e.toString() }; }
+}
+
+async function updateAll(){
+  // CoinGecko
+  const cg = await fetchJson('/api/coingecko/global');
+  document.getElementById('coingecko').textContent = cg.success ? (Math.round(cg.data.data.market_cap_change_percentage_24h_usd*100)/100)+'% 24h' : 'Erro';
+  document.getElementById('coingecko_small').textContent = cg.success ? 'BTC.D: '+cg.data.data.market_cap_percentage.btc+'%' : '';
+
+  // CoinPaprika
+  const cp = await fetchJson('/api/coinpaprika/global');
+  document.getElementById('coinpaprika').textContent = cp.success ? ('TOTAL: $'+Number(cp.data.total_market_cap_usd).toLocaleString()) : 'Erro';
+
+  // Coinglass sample: use flow for ICNT if available
+  const cgf = await fetchJson('/api/coinglass/flow?symbol=ICNT');
+  document.getElementById('coinglass_fng').textContent = cgf.success ? JSON.stringify(cgf.data).slice(0,120) : 'Sem key/Erro';
+  document.getElementById('coinglass_fng_small').textContent = '';
+
+  // Fear & Greed
+  const fng = await fetchJson('/api/fng');
+  document.getElementById('fng').textContent = fng.success ? (fng.data.data[0].value + ' — ' + fng.data.data[0].value_classification) : 'Erro';
+
+  // Altseason
+  const alt = await fetchJson('/api/altseason');
+  document.getElementById('altseason').textContent = alt.success ? (alt.data && alt.data.data ? alt.data.data.score : JSON.stringify(alt.data)).toString() : 'Erro';
+
+  // ICNT depth
+  const d = await fetchJson('/api/mexc/depth?symbol=ICNTUSDT');
+  document.getElementById('icnt_depth').textContent = d.success ? ('Bids: '+(d.data.bids?d.data.bids.length:0)+' / Asks: '+(d.data.asks?d.data.asks.length:0)) : 'Erro';
+
+  writeLog('Atualizado');
+}
+
+updateAll();
+setInterval(updateAll, 15000);
+</script>
+</body>
+</html>
